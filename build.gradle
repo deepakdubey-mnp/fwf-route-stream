@@ -1,0 +1,78 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.6'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.fwp'
+version = '0.0.1-SNAPSHOT'
+description = 'fwp-route-stream'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://packages.confluent.io/maven/'
+    }
+}
+
+// Force Confluent Kafka artifacts throughout; prevents transitive OSS versions overriding ccs builds
+configurations.configureEach {
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        if (details.requested.group == 'org.apache.kafka' &&
+                details.requested.name in ['kafka-clients', 'kafka-streams']) {
+            details.useVersion '7.9.0-ccs'
+        }
+    }
+}
+
+dependencies {
+    // --- Kafka (Confluent Community) ---
+    implementation 'org.apache.kafka:kafka-clients:7.9.0-ccs'
+    implementation 'org.apache.kafka:kafka-streams:7.9.0-ccs'
+    implementation 'org.rocksdb:rocksdbjni:9.7.3'
+
+    // --- Spring Boot + Kafka integration ---
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation('org.springframework.kafka:spring-kafka') {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+        exclude group: 'org.apache.kafka', module: 'kafka-streams'
+    }
+
+    // --- Persistence ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.data:spring-data-envers'
+    implementation 'org.hibernate.orm:hibernate-envers'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // --- JSON serialization ---
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // --- Actuator: health + /streams metrics endpoint ---
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // --- Lombok ---
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // --- Test ---
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation('org.apache.kafka:kafka-streams-test-utils:7.9.0-ccs') {
+        exclude group: 'org.apache.kafka', module: 'kafka-clients'
+    }
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
